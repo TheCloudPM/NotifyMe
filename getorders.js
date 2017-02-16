@@ -8,7 +8,6 @@ var rest = require('restler');
 var Step = require('step');
 var moment = require ('moment');
 var Now = new Date();
-var requestMethod = 'GET';
 var outputfilePath = './output.txt';
 var AUTH_SIGNATUREarr = [];
 var TIMESTAMParr = [];
@@ -17,9 +16,6 @@ var TIMESTAMP = '';
 var fs = require('fs'),
     xml2js = require('xml2js');
 var parser = new xml2js.Parser();
-
-// var requestURL = 'https://marketplace.walmartapis.com/v3/orders?createdStartDate=' + todayDate;
-var requestURL = 'https://marketplace.walmartapis.com/v3/orders?createdStartDate=2017-01-01';
 
 
 
@@ -136,7 +132,11 @@ function getorders(user){
 
     var javaresult = '';
     var strarr = [];
-    var todayDate = moment().format('YYYY-MM-DD');
+    var today = moment().format('YYYY-MM-DD');
+    var todayUTC = today +"T08:00:00.000Z";
+    var requestURL = 'https://marketplace.walmartapis.com/v3/orders?createdStartDate=' + todayUTC;
+    //var requestURL = 'https://marketplace.walmartapis.com/v3/orders?createdStartDate=2017-01-01';
+    var requestMethod = 'GET';
 
 
     const spawn = require('child_process').spawn;
@@ -180,6 +180,12 @@ function getorders(user){
 
           if (result["ns2:errors"]) {
             orderdata.ordercount = -1;
+            orderdata.ordetotal = 0;
+          };
+
+          if (result["ns4:errors"]) {
+            orderdata.ordercount = 0;
+            orderdata.ordetotal = 0;
           }
           else {
           MPorders = result["ns3:list"]["ns3:elements"]["ns3:order"];
@@ -232,7 +238,7 @@ function ordercheck(){
  // all users
 
 // check for new orders every 5 min
-// cron.schedule('*/5 * * * *', function(){
+cron.schedule('*/10 * * * *', function(){
    console.log("Go! " + Now);
    ordercheck();
-// });
+});
