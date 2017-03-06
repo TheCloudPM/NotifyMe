@@ -5,7 +5,6 @@ var config  = require('./config/database'); // get db config file
 var NewOrders  = require('./app/models/neworders');
 var sleep = require('sleep');
 var rest = require('restler');
-var Step = require('step');
 var moment = require ('moment');
 var Now = new Date();
 var outputfilePath = './output.txt';
@@ -16,9 +15,6 @@ var TIMESTAMP = '';
 var fs = require('fs'),
     xml2js = require('xml2js');
 var parser = new xml2js.Parser();
-
-
-
 
 var mongoose   = require('mongoose');
 mongoose.connect(config.database);
@@ -99,6 +95,7 @@ var cleanXML = function(xml){
     return xml;
 };
 
+// save orders to order record
 function saverecord(orderdata,user){
 
   var newOrderRec = new NewOrders({
@@ -137,6 +134,7 @@ function getorders(user){
     var requestURL = 'https://marketplace.walmartapis.com/v3/orders?createdStartDate=' + todayUTC;
     //var requestURL = 'https://marketplace.walmartapis.com/v3/orders?createdStartDate=2017-01-01';
     var requestMethod = 'GET';
+    var MPorders = [];
 
 
     const spawn = require('child_process').spawn;
@@ -176,7 +174,7 @@ function getorders(user){
        console.log('Error:', result.message);
      } else {
           result=cleanXML(result);
-          console.dir(result, { showHidden: true, depth: null });
+          // console.dir(result, { showHidden: true, depth: null });
 
           if (result["ns2:errors"]) {
             orderdata.ordercount = -1;
@@ -188,19 +186,41 @@ function getorders(user){
             orderdata.ordetotal = 0;
           }
           else {
+
           MPorders = result["ns3:list"]["ns3:elements"]["ns3:order"];
-          for (var x = 0, lenx = MPorders.length; x < lenx; x++) {
-            orderlines=MPorders[x]["ns3:orderLines"];
+          // only 1 order
+          if (!MPorders.length) {
+            orderlines=MPorders["ns3:orderLines"];
+            // console.log ("Orderlines:" + orderlines.length);
             for (var y = 0, leny = orderlines.length; y < leny; y++) {
               ordercharges=orderlines[y]["ns3:charges"];
               orderstatus=orderlines[y]["ns3:orderLineStatuses"]["ns3:orderLineStatus"]["ns3:status"];
               for (var z = 0, lenz = ordercharges.length; z < lenz; z++) {
-                console.log ("CHARGE below" + x);
-                console.dir(ordercharges[z], { showHidden: true, depth: null });
+                // console.dir(ordercharges[z], { showHidden: true, depth: null });
                 productcharge=ordercharges[z]["ns3:chargeAmount"]["ns3:amount"];
                 sumofcharges +=productcharge;
               }
-              console.log('orderstatus:' + orderstatus);
+              // console.log('orderstatus:' + orderstatus);
+              if (orderstatus == 'Created') {
+                orderdata.ordercount++;
+                orderdata.ordertotal +=sumofcharges;
+                sumofcharges=0;
+              }
+            }
+          }
+          else {
+          for (var x = 0, lenx = MPorders.length; x < lenx; x++) {
+            orderlines=MPorders[x]["ns3:orderLines"];
+            // console.log ("Orderlines:" + orderlines.length);
+            for (var y = 0, leny = orderlines.length; y < leny; y++) {
+              ordercharges=orderlines[y]["ns3:charges"];
+              orderstatus=orderlines[y]["ns3:orderLineStatuses"]["ns3:orderLineStatus"]["ns3:status"];
+              for (var z = 0, lenz = ordercharges.length; z < lenz; z++) {
+                // console.dir(ordercharges[z], { showHidden: true, depth: null });
+                productcharge=ordercharges[z]["ns3:chargeAmount"]["ns3:amount"];
+                sumofcharges +=productcharge;
+              }
+              // console.log('orderstatus:' + orderstatus);
               if (orderstatus == 'Created') {
                 orderdata.ordercount++;
                 orderdata.ordertotal +=sumofcharges;
@@ -211,6 +231,7 @@ function getorders(user){
 
         }
    }
+ }
    saverecord(orderdata,user);
  }); // and of get function
 
@@ -231,7 +252,9 @@ ls.on('close', (code) => {
 function ordercheck(){
   User.find({}, function(err, allusers) {
   for (var i = 0, leni = allusers.length; i < leni; i++) {
-      getorders(allusers[i]);
+    if (allusers[i].firstlogin === false) {
+        getorders(allusers[i]);
+    }
   }
   });
 }

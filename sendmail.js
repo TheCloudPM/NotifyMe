@@ -13,13 +13,13 @@ var mongoose   = require('mongoose');
 mongoose.connect(config.database);
 
 // send new order update email
-function sendmail(email,ordercount) {
+function sendmail(email,ordercount,ordervalue) {
 
 var data = {
-  from: 'Node Test User <me@sandbox4b9aeb95096945bf9ea0f40ec1e12828.mailgun.org>',
+  from: 'Walmart Notifications <me@sandbox4b9aeb95096945bf9ea0f40ec1e12828.mailgun.org>',
   to: email,
-  subject: 'New order notification',
-  text: 'You have ' + ordercount + ' new orders.'
+  subject: 'Walmart - New order notification',
+  text: 'You have ' + ordercount + ' new orders with a total order value of $'+ ordervalue + '.'
 };
 
 if (ordercount == -1) {
@@ -46,12 +46,12 @@ function getandsend(orderdata,interval) {
 
   if (minutes/interval % 1 === 0) {
      console.log("time run:" + minutes + " Min schedule run:" + interval);
-     sendmail(orderdata.email,orderdata.NewOrderCount);
+     sendmail(orderdata.email,orderdata.NewOrderCount,orderdata.ordertotal);
    }
    else {
      if (hours/(interval/60) % 1 === 0 && minutes/interval % 1 === 0 ) {
        console.log("time run:" + minutes + " Hour schedule run:" + interval);
-       sendmail(orderdata.email,orderdata.NewOrderCount);
+       sendmail(orderdata.email,orderdata.NewOrderCount,orderdata.ordertotal);
      }
    }
   }
@@ -67,7 +67,9 @@ function sendtoall() {
 // find all users then find latest new order record
 User.find({}, function(err, allusers) {
       for (var i = 0, leni = allusers.length; i < leni; i++) {
-       lastrecord(allusers[i]);
+      if (allusers[i].notify === true) {
+        lastrecord(allusers[i]);
+      }
       } // for
     }); // find users
 }

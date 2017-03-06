@@ -20,7 +20,8 @@ var UserSchema = new Schema({
   email: String,
   schedule: Number,
   notify: Boolean,
-  notifyzero: Boolean
+  notifyzero: Boolean,
+  firstlogin: Boolean
 });
 
 UserSchema.pre('save', function (next) {

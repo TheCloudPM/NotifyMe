@@ -21,6 +21,9 @@ var NewOrders   = require('./app/models/neworders');
 var jwt         = require('jwt-simple');
 var moment      = require ('moment');
 
+var WMTapi = require ('./wmtapivalidator.js');
+var WMTorders = require ('./wmtgetorders.js');
+
 var mongoose   = require('mongoose');
 mongoose.connect(config.database);
 
@@ -64,7 +67,8 @@ router.post('/users/signup', function(req, res) {
   } else {
     var newUser = new User({
       name: req.body.name,
-      password: req.body.password
+      password: req.body.password,
+      firstlogin: true
     });
     // save the user
     newUser.save(function(err) {
@@ -103,7 +107,6 @@ router.post('/users/authenticate', function(req, res) {
 // route to a restricted info (GET http://localhost:8080/api/memberinfo)
 router.get('/users/memberinfo', passport.authenticate('jwt', { session: false}), function(req, res) {
   var token = getToken(req.headers);
-  console.log('got the info call');
   if (token) {
     var decoded = jwt.decode(token, config.secret);
     User.findOne({
@@ -114,16 +117,16 @@ router.get('/users/memberinfo', passport.authenticate('jwt', { session: false}),
         if (!user) {
           return res.status(403).send({success: false, msg: 'Authentication failed. User not found.'});
         } else {
-          console.log(user);
           res.json({success: true,
                     msg: user.name,
                     user: user.name,
                     email: user.email,
                     consumerID: user.consumerID,
-                    pkey: user.pkey,
+                    pKey: user.pKey,
                     schedule: user.schedule,
                     notify: user.notify,
-                    notifyzero: user.notifyzero });
+                    notifyzero: user.notifyzero,
+                    firstlogin: user.firstlogin });
         }
     });
   } else {
@@ -132,6 +135,30 @@ router.get('/users/memberinfo', passport.authenticate('jwt', { session: false}),
 });
 
 
+router.post('/users/update/nokeys', passport.authenticate('jwt', { session: false}), function(req, res) {
+  var token = getToken(req.headers);
+  if (token) {
+    var decoded = jwt.decode(token, config.secret);
+    User.findOne({
+      name: decoded.name
+    }, function(err, user) {
+        if (err) throw err;
+
+        if (!user) {
+          return res.status(403).send({success: false, msg: 'Authentication failed. User not found.'});
+        } else {
+          user.email = req.body.email;
+          user.schedule = req.body.schedule;
+          user.notify = req.body.notify;
+          user.notifyzero = req.body.notifyzero;
+          user.save();
+          res.json({success: true, msg: 'Record updated!' + req.body.consumerID });
+        }
+    });
+  } else {
+    return res.status(403).send({success: false, msg: 'No token provided.'});
+  }
+});
 
 router.post('/users/update', passport.authenticate('jwt', { session: false}), function(req, res) {
   var token = getToken(req.headers);
@@ -146,11 +173,12 @@ router.post('/users/update', passport.authenticate('jwt', { session: false}), fu
           return res.status(403).send({success: false, msg: 'Authentication failed. User not found.'});
         } else {
           user.consumerID = req.body.consumerID;
-          // user.pKey = req.body.pKey;
+          user.pKey = req.body.pKey;
           user.email = req.body.email;
           user.schedule = req.body.schedule;
           user.notify = req.body.notify;
           user.notifyzero = req.body.notifyzero;
+          user.firstlogin = req.body.firstlogin;
           user.save();
           res.json({success: true, msg: 'Record updated!' + req.body.consumerID });
         }
@@ -162,7 +190,6 @@ router.post('/users/update', passport.authenticate('jwt', { session: false}), fu
 
 router.get('/orders', passport.authenticate('jwt', { session: false}), function(req, res) {
   var token = getToken(req.headers);
-  console.log('got the order call');
   if (token) {
     var decoded = jwt.decode(token, config.secret);
     User.findOne({
@@ -184,9 +211,10 @@ router.get('/orders', passport.authenticate('jwt', { session: false}), function(
   }
 });
 
-router.get('/orders/key/validate', passport.authenticate('jwt', { session: false}), function(req, res) {
+router.post('/orders/live', passport.authenticate('jwt', { session: false}), function(req, res) {
   var token = getToken(req.headers);
-  console.log('validate API creds');
+  var apicreds = { consumerID: req.body.consumerID,
+                   pKey: req.body.pKey };
   if (token) {
     var decoded = jwt.decode(token, config.secret);
     User.findOne({
@@ -197,7 +225,39 @@ router.get('/orders/key/validate', passport.authenticate('jwt', { session: false
         if (!user) {
           return res.status(403).send({success: false, msg: 'Authentication failed. User not found.'});
         } else {
-             res.json({success: true, msg: 'Credentials valid' });
+             WMTorders.orderdata(apicreds,function(response) {
+               var PTdate = moment().format("MM-DD-YY hh:mm:ss a");
+               res.json({success: true, orders: response.ordercount, ordertotal:response.ordertotal, createdate: PTdate });
+             })
+           }
+          }
+        ); // findone
+  } else {
+    return res.status(403).send({success: false, msg: 'No token provided.'});
+  }
+});
+
+router.post('/orders/keys/validate', passport.authenticate('jwt', { session: false}), function(req, res) {
+  var token = getToken(req.headers);
+  var apicreds = { consumerID: req.body.consumerID,
+                   pKey: req.body.pKey };
+
+  if (token) {
+    var decoded = jwt.decode(token, config.secret);
+    User.findOne({
+      name: decoded.name
+    }, function(err, user) {
+        if (err) throw err;
+        if (!user) {
+          return res.status(403).send({success: false, msg: 'Credentials invalid'});
+        } else {
+             WMTapi.responsecode(apicreds,function(response){
+               if (response != '401') {
+                 res.json({success: true, msg: 'Credentials valid' });
+               } else {
+                 res.json({success: false, msg: 'Credentials invalid' });
+               }
+             });
               }
             } //callback
           );
