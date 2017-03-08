@@ -226,7 +226,7 @@ router.post('/orders/live', passport.authenticate('jwt', { session: false}), fun
           return res.status(403).send({success: false, msg: 'Authentication failed. User not found.'});
         } else {
              WMTorders.orderdata(apicreds,function(response) {
-               var PTdate = moment().utcOffset("+08:00").format("MM-DD-YY hh:mm:ss a");
+               var PTdate = moment().utcOffset("-08:00").format("MM-DD-YY hh:mm:ss a");
                res.json({success: true, orders: response.ordercount, ordertotal:response.ordertotal, createdate: PTdate });
              })
            }
