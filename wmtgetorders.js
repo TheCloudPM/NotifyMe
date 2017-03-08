@@ -94,7 +94,7 @@ var orderdata = function getorders(user, callback){
 
     var javaresult = '';
     var strarr = [];
-    var today = moment().format('YYYY-MM-DD');
+    var today = moment().utcOffset("-08:00").format('YYYY-MM-DD');
     var todayUTC = today +"T08:00:00.000Z";
     var requestURL = 'https://marketplace.walmartapis.com/v3/orders?createdStartDate=' + todayUTC;
     //var requestURL = 'https://marketplace.walmartapis.com/v3/orders?createdStartDate=2017-01-01';
