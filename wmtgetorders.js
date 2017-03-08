@@ -196,6 +196,7 @@ var orderdata = function getorders(user, callback){
 
         }
    }
+   console.log(orderdata);
    return callback(orderdata)
  }
 
